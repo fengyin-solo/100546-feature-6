@@ -82,7 +82,7 @@ import {
 import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('warning')
-const columns = ["预警编号", "发布对象", "预警级别", "触发雨量", "发布时间", "发布渠道", "解除时间", "预警状态"]
+const columns = ["预警编号", "发布对象", "预警级别", "重点户", "触发雨量", "发布时间", "发布渠道", "解除时间", "预警状态"]
 const actions = ["确认发布", "解除预警", "标记误报"]
 const statuses = ["待发布", "已发布", "已解除", "已误报"]
 const stats = [{"label": "待发布预警", "value": 0}, {"label": "已发布预警", "value": 0}, {"label": "本月误报数", "value": 0}]

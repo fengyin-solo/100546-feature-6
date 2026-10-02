@@ -11,7 +11,13 @@
     <main class="app-main">
       <header class="app-head">
         <span class="head-desc">面向隐患点建档、坡体形变与裂缝观测、雨量预警发布、避险搬迁与治理工程验收的山区地质灾害防治工作台。</span>
-        <span class="head-user">当前值班：{{ store.operator }} · {{ store.shiftLabel }}</span>
+        <span class="head-user">
+          当前值班：{{ store.operator }} · {{ store.shiftLabel }} · 值班乡镇
+          <select v-model="township" class="head-select">
+            <option value="">（未指定）</option>
+            <option v-for="item in townships" :key="item" :value="item">{{ item }}</option>
+          </select>
+        </span>
       </header>
       <RouterView />
     </main>
@@ -19,9 +25,18 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+
+import { TOWNSHIPS } from '@/data/jurisdiction'
 import { useSessionStore } from '@/stores/session'
 
 const store = useSessionStore()
+const townships = TOWNSHIPS
+// 各入口取到的所在乡镇是同一份：这里改，隐患点建档与数据层校验跟着变。
+const township = computed({
+  get: () => store.township,
+  set: (value: string) => store.setTownship(value),
+})
 
 const navItems = [{ label: "运营概览", path: "/" }, { label: "隐患点建档", path: "/hazard" }, { label: "边坡形变", path: "/slope" }, { label: "裂缝观测", path: "/crack" }, { label: "雨量站网", path: "/rain" }, { label: "预警发布", path: "/warning" }, { label: "群测群防巡查", path: "/patrol" }, { label: "避险搬迁", path: "/relocate" }, { label: "避险场所", path: "/refuge" }, { label: "应急演练", path: "/drill" }, { label: "治理工程", path: "/project" }, { label: "削坡减载", path: "/cutting" }, { label: "支挡结构", path: "/wall" }, { label: "排水系统", path: "/drainage" }, { label: "警示标识", path: "/signboard" }, { label: "险情上报", path: "/report" }, { label: "专家会商", path: "/consult" }, { label: "隐患核销", path: "/clearance" }, { label: "受威胁对象", path: "/threat" }]
 </script>
