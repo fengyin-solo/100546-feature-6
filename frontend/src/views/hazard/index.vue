@@ -11,6 +11,13 @@
       </div>
     </header>
 
+    <p class="rule-note">
+      当前值班乡镇：<strong>{{ dutyTownship || '未登记' }}</strong>。
+      隐患编号归属哪个乡镇，就只有那个乡镇的值班人员能提交核查、列入重点防范、登记消除；跨乡镇提交会被挡下并写明原因。
+      管辖乡镇与灾害类型冲突时以管辖乡镇（所在乡镇）为准，灾害类型不参与权限判定；所在乡镇为空按无效值处理，退回重填。
+      状态只能沿 待核查 → 建档中 → 重点防范 → 已消除 顺向推进；列入重点防范后自动同步预警发布台账并添上重点户，重复提交不会多出第二条记录。
+    </p>
+
     <div class="stat-row">
       <article v-for="item in stats" :key="item.label" class="stat-card">
         <span class="stat-label">{{ item.label }}</span>
@@ -46,15 +53,18 @@
           <td v-for="column in columns" :key="column">{{ row[column] ?? '—' }}</td>
           <td>{{ row.status }}</td>
           <td class="row-actions">
-            <button
-              v-for="action in actions"
-              :key="action"
-              class="link"
-              type="button"
-              @click="runAction(action, row)"
-            >
-              {{ action }}
-            </button>
+            <template v-if="permissionOf(row).editable && permissionOf(row).allowedActions.length">
+              <button
+                v-for="action in permissionOf(row).allowedActions"
+                :key="action"
+                class="link"
+                type="button"
+                @click="runAction(action, row)"
+              >
+                {{ action }}
+              </button>
+            </template>
+            <span v-else class="readonly-tag">{{ permissionOf(row).reason || '只读' }}</span>
           </td>
         </tr>
         <tr v-if="!rows.length">
@@ -65,6 +75,7 @@
 
     <footer class="page-foot">
       <span>共 {{ total }} 条隐患点建档记录</span>
+      <span v-if="noticeMessage" class="notice-text">{{ noticeMessage }}</span>
       <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
     </footer>
   </section>
@@ -74,22 +85,25 @@
 import { computed, onMounted, ref } from 'vue'
 
 import {
+  currentDutyTownship,
   downloadEntries,
+  hazardPermission,
   listEntries,
   moduleMeta,
   runAction as applyAction,
+  type HazardPermission,
 } from '@/api/local-service'
 import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('hazard')
 const columns = ["隐患编号", "所在乡镇", "灾害类型", "坡体规模", "威胁户数", "威胁人数", "发现日期", "隐患状态"]
-const actions = ["提交核查", "列入重点防范", "登记消除"]
 const statuses = ["待核查", "建档中", "重点防范", "已消除"]
 const stats = [{"label": "重点防范隐患点", "value": 0}, {"label": "待核查隐患点", "value": 0}, {"label": "威胁人数合计", "value": 0}]
 
 const rows = ref<EntryRow[]>([])
 const total = ref(0)
 const errorMessage = ref('')
+const noticeMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
 const statusSummary = computed(() =>
@@ -98,6 +112,22 @@ const statusSummary = computed(() =>
     count: rows.value.filter((row) => String(row.status) === status).length,
   })),
 )
+
+// 值班乡镇从会话里取，和服务层管辖校验用的是同一份，页面上看到的就是实际生效的。
+const dutyTownship = computed(() => currentDutyTownship())
+
+// 每行的可操作权限由服务层统一判定，页面只渲染结论：能改的给动作按钮，不能改的给只读原因。
+const permissions = computed(() => {
+  const map = new Map<number, HazardPermission>()
+  for (const row of rows.value) {
+    map.set(Number(row.id), hazardPermission(row))
+  }
+  return map
+})
+
+function permissionOf(row: EntryRow): HazardPermission {
+  return permissions.value.get(Number(row.id)) ?? { editable: false, reason: '只读', allowedActions: [] }
+}
 
 function resetFilters() {
   filters.value = {}
@@ -114,11 +144,13 @@ function openCreate() {
 
 function runAction(action: string, row: EntryRow) {
   errorMessage.value = ''
+  noticeMessage.value = ''
   const result = applyAction(meta.key, Number(row.id), action)
   if (!result.ok) {
     errorMessage.value = result.message
     return
   }
+  noticeMessage.value = result.message
   reload()
 }
 
